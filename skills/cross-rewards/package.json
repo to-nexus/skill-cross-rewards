@@ -1,0 +1,12 @@
+{
+  "name": "cross-rewards",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "CROSS Chain rewards staker driver — bundled by the cross-rewards Claude skill.",
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "viem": "^2.21.0",
+    "dotenv": "^16.4.5"
+  }
+}

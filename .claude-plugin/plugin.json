@@ -1,0 +1,16 @@
+{
+  "name": "cross-rewards",
+  "description": "CROSS Chain (id 612055) single-pool, multi-reward staker driver via EOA + viem. Stake WCROSS into the rewards contract at 0xd9767038edb5c7ff1735d5a567696947d4907300, claim accrued reward tokens (e.g. CWT), and read pool/user state — all via natural language. Triggers on phrases like '스테이킹', '보상 수령', 'rewards 풀 보여줘', 'WCROSS deposit', 'harvest cross rewards', 'withdraw from cross staker'.",
+  "author": {
+    "name": "to-nexus"
+  },
+  "homepage": "https://github.com/to-nexus/skill-cross-rewards",
+  "keywords": [
+    "cross-chain",
+    "staking",
+    "rewards",
+    "wcross",
+    "evm",
+    "yield"
+  ]
+}
