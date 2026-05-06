@@ -11,8 +11,6 @@ A Claude Code skill that drives the **CROSS Chain rewards staker** at `0xd976703
 
 > ⚠️ **This skill signs and broadcasts real transactions with the private key you provide.** Test with `minDepositAmount()` (currently 1 WCROSS). Set `MAX_STAKE_NOTIONAL` in `.env`. Read `skills/cross-rewards/scripts/*.mjs` before using.
 
-> 🔒 **Private repository.** Owner (`to-nexus`) installs via `gh auth login`. Others need collaborator access or `GITHUB_TOKEN`. See the umbrella [`cross-skills-suite` README](https://github.com/to-nexus/cross-skills-suite#authenticating-to-private-repos) for details.
-
 ---
 
 ## Install — Recommended (via Marketplace)
