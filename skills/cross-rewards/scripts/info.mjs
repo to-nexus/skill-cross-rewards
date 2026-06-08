@@ -154,7 +154,7 @@ async function main() {
 
 main().catch((err) => {
   if (process.env.DEBUG) {
-    process.stderr.write(String(err?.stack || err) + '\n');
+    process.stderr.write(String(err?.message || err) + '\n');
   }
   emit(envelopeError(err));
   process.exit(1);

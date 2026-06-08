@@ -154,8 +154,8 @@ Confirms `pendingRewards` returns parallel arrays `(address[] rewardTokens, uint
 This contract is a UUPS-upgradable OZ-v5 contract. We have **not** observed the DEX-style `0xa7392345` smart-wallet rejection here — the contract appears to accept calls from contract `msg.sender` (no `tx.origin == msg.sender` guard found in the dispatcher snippet). However:
 
 - ERC-4337 / smart-wallet relays remain **untested** against this contract in this skill's v0.1 scope.
-- `skill-cross-dex-trade`'s `0xa7392345` paragraph still applies if a user later combines a DEX swap (rejected from contract callers) with a deposit (works from contract callers) inside one bundled UserOperation: only the DEX leg fails.
-- v0.1 of `skill-cross-rewards` is **EOA-only** (private key + viem wallet client), matching `skill-cross-dex-trade`. ERC-4337 / paymaster / bundler is out of scope.
+- Do not bundle this skill with `skill-cross-dex-trade`; their contract-caller behavior differs.
+- v0.1 of `skill-cross-rewards` is **EOA-only** (local signer env + viem wallet client), matching `skill-cross-dex-trade`. ERC-4337 / paymaster / bundler is out of scope.
 
 ## Open questions for next phase
 

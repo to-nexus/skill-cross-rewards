@@ -1,15 +1,15 @@
 ---
 name: cross-rewards
-description: This skill should be used when the user asks to list, view, deposit into, withdraw from, or claim rewards on any CROSS Chain reward pool exposed by https://x.crosstoken.io/rewards — multiple single-pool, multi-reward staker contracts (CrossPool deposits = WCROSS; GamePool deposits vary, e.g. CROMx). The pool catalog is fetched live from cross-game-reward-api.crosstoken.io. Pass --pool <reward-symbol|address|pool_id> to target a specific pool. Triggers on phrases like "rewards 풀 목록", "보상 수령", "WCROSS stake", "deposit to RUBYx pool", "withdraw from cross staker", "harvest GHUBx rewards", "내 stake 잔고", "내 풀 정보".
+description: This skill should be used when the user asks to list, view, or manage CROSS Chain reward pools exposed by https://x.crosstoken.io/rewards — multiple single-pool, multi-reward contracts (CrossPool asset = WCROSS; GamePool asset varies, e.g. CROMx). The pool catalog is fetched live from cross-game-reward-api.crosstoken.io. Pass --pool <reward-symbol|address|pool_id> to target a specific pool. Triggers on phrases like "rewards 풀 목록", "보상 수령", "WCROSS pool", "RUBYx pool", "GHUBx rewards", "내 pool 잔고", "내 풀 정보".
 version: 0.2.0
 license: MIT
 ---
 
 # CROSS Chain Rewards Staker
 
-A distributable skill that lets Claude read pool/user state and submit `deposit` / `withdraw` / `claimRewards` / `claimReward` transactions against any CROSS Chain rewards staker exposed at `https://x.crosstoken.io/rewards`. Execution path is **EOA + viem** — no ERC-4337 / paymaster.
+A distributable skill that lets Claude read pool/user state and execute the supported reward-pool write commands exposed at `https://x.crosstoken.io/rewards`. Execution path is **EOA + viem** — no ERC-4337 / paymaster.
 
-> **Scope (v0.2):** Multi-pool — the catalog is fetched live from `https://cross-game-reward-api.crosstoken.io/api/v1/pools`. Each pool is its own staker contract; deposit token is **WCROSS** for `CrossPool` rows and varies for `GamePool` rows (e.g. CROMx). Reward registry per pool is dynamic — the skill always iterates `getRewardTokens()`. Operator-only paths (`depositFor` / `withdrawFor` / `claimRewardFor` / `claimRewardsFor`) are **not** exposed. The `--pool <key>` flag routes commands to a specific contract; without it, the skill targets the legacy default `0xd9767038edb5c7ff1735d5a567696947d4907300` (CWT pool).
+> **Scope (v0.2):** Multi-pool — the catalog is fetched live from `https://cross-game-reward-api.crosstoken.io/api/v1/pools`. Each pool is its own contract; the pool asset is **WCROSS** for `CrossPool` rows and varies for `GamePool` rows (e.g. CROMx). Reward registry per pool is dynamic — the skill always iterates `getRewardTokens()`. Operator-only variants are **not** exposed. The `--pool <key>` flag routes commands to a specific contract; without it, the skill targets the legacy default `0xd9767038edb5c7ff1735d5a567696947d4907300` (CWT pool).
 >
 > Deeper protocol details (verified ABI, calldata layouts, custom-error selectors, smart-wallet caveat) live in `references/cross-rewards.md`. Read it only when needed — it stays out of context otherwise.
 
@@ -59,25 +59,20 @@ SKILL_DIR="$HOME/.claude/skills/cross-rewards"
 
 ## 3. Credential resolution — strict priority
 
-Resolve the staking EOA in this order. **Never echo the private key back to the user, never write it into the conversation transcript, never log it.**
+Resolve the staking EOA in this order. **Never echo wallet secrets back to the user, never write them into the conversation transcript, never log them, and never ask the user to paste them into chat.**
 
 1. **`./.env` in the user's current working directory** — read `PRIVATE_KEY` and (optionally) `WALLET_ADDRESS`, `CROSS_RPC_URL`, `MAX_STAKE_NOTIONAL`, `CONFIRM_THRESHOLD`, `MIN_GAS_CROSS`, `REWARDS_CONTRACT`.
 2. **`$HOME/.claude/skills/cross-rewards/.env`** — same vars, used as the personal default.
-3. **Ask the user** — only if both files lack `PRIVATE_KEY`. Use this exact prompt:
+3. **Local signer config unavailable** — if both files lack `PRIVATE_KEY`, stop and point the user to `~/.claude/skills/cross-rewards/.env`:
 
-   > "I need a CROSS Chain EOA private key (0x-prefixed, 64 hex chars) to sign the staking tx.
-   > **Option A (recommended):** stop here, paste this into `~/.claude/skills/cross-rewards/.env`:
-   > ```
-   > PRIVATE_KEY=0x...
-   > MAX_STAKE_NOTIONAL=10
-   > CONFIRM_THRESHOLD=1
-   > MIN_GAS_CROSS=0.001
-   > ```
-   > then re-ask. I won't see it.
-   >
-   > **Option B (one-shot):** paste it now. It will be passed to the script via process env only and will NOT be saved to disk by me. It will appear once in this transcript."
+   ```bash
+   PRIVATE_KEY=<0x-prefixed-64-hex-secret>
+   MAX_STAKE_NOTIONAL=10
+   CONFIRM_THRESHOLD=1
+   MIN_GAS_CROSS=0.001
+   ```
 
-   If the user picks B, accept the PK as a string, **do not echo it**, pass it to the script as `PRIVATE_KEY=...` on the same Bash command line, and after the action tell the user to consider rotating the key if the transcript is shared.
+   Then ask them to re-run the request. Do not collect the secret in chat, and do not pass it on the command line.
 
 Validation: the value must match `^0x[0-9a-fA-F]{64}$`. Reject otherwise without retrying silently.
 
@@ -92,7 +87,7 @@ Before submitting any tx (the bundled scripts also enforce these — never bypas
 3. **`CONFIRM_THRESHOLD` + `--confirm` gate** — any deposit/withdraw amount > `CONFIRM_THRESHOLD` (default `1` WCROSS) aborts with `{ok:false, error:"awaiting_confirm", parsedIntent}` exit 2 unless invoked with `--confirm`. Re-invoke with `--confirm` ONLY after an explicit user "yes / 진행". For `harvest`, the same gate fires when any single pending reward amount exceeds the threshold.
 4. **Native CROSS gas pre-flight** — every write op aborts before signing if the EOA's native CROSS balance < `MIN_GAS_CROSS` (default `0.001`).
 5. **`minDepositAmount()` guard** — `deposit.mjs` reads on-chain min and aborts if the requested amount is below it (currently `1.0 WCROSS`).
-6. **`--wrap` only when asked** — never silently consume native CROSS. The `--wrap` flag is opt-in. Without it, `deposit.mjs` aborts with `insufficient_wcross` if the wallet's WCROSS is short.
+6. **`--wrap` only when asked** — never silently consume native CROSS. The `--wrap` flag is opt-in. Without it, the write command aborts with `insufficient_wcross` if the configured address has too little WCROSS.
 7. **WALLET_ADDRESS mismatch warning** — if the env-declared address doesn't match the address derived from the PK, the JSON envelope includes `signerWarn`; surface that to the user before continuing.
 
 ---
@@ -139,7 +134,7 @@ Without `--pool`, commands target the legacy default (`0xd9767038…4907300`, th
 
 - `pools` — fetch the live pool catalog from cross-game-reward-api. Returns address, type (CrossPool/GamePool), status, deposit symbol, reward symbols, and total notional for every pool. Read-only, no PK needed.
 - `info [--pool <key>]` — pool detail + (if PK loaded) user staked + pendingRewards for the resolved pool. Read-only.
-- `balance [--pool <key>]` — wallet snapshot: native CROSS, deposit-token wallet balance, staked, pendingRewards, claimed reward-token wallet balances for the resolved pool.
+- `balance [--pool <key>]` — configured-address snapshot: native CROSS, pool-asset balance, pool position, pending rewards, claimed reward-token balances for the resolved pool.
 - `deposit <amount> [--pool <key>] [--wrap] [--confirm]` — approve (if short) → `deposit(amount)` on the resolved pool. `--wrap` only legal when the resolved pool's depositToken is WCROSS; otherwise aborts with `wrap_not_supported`.
 - `withdraw <amount|all> [--pool <key>] [--confirm]` — `withdraw(amount)`; `all` reads `balances(addr)` on the resolved pool.
 - `harvest [token] [--pool <key>] [--confirm]` — `claimRewards()` (sweep) or `claimReward(token)` (single) on the resolved pool. Pre-reads `pendingRewards`; aborts cleanly with `nothing_to_claim` if everything is zero.
@@ -153,7 +148,7 @@ After every action, surface to the user:
 - The parsed intent (so they can audit it) — echo the `parsedIntent` field
 - `txHash` and the explorer link `https://explorer.crosstoken.io/612055/tx/<hash>`
 - Receipt `status` (`success` / `reverted`)
-- Wallet tail (last 6 chars of the EOA address — never the full PK)
+- Address tail (last 6 chars of the EOA address — never the full PK)
 - For deposit: `stakedBefore` → `stakedAfter`, plus `wrap` and `approval` sub-objects when present
 - For withdraw: `stakedBefore` → `stakedAfter`
 - For harvest: `rewardsBefore` → `rewardsAfter` and the updated `walletRewards`
@@ -170,6 +165,6 @@ This skill folder is the unit of distribution. Recipients:
 
 1. Copy the whole `cross-rewards/` folder into `~/.claude/skills/`
 2. Run `cd ~/.claude/skills/cross-rewards && npm install` once (or let the skill do it on first use)
-3. Either create `~/.claude/skills/cross-rewards/.env` from `.env.example`, or let the skill prompt them on first run
+3. Create `~/.claude/skills/cross-rewards/.env` from `.env.example` before using write-path commands
 
 Cross-link: deeper details (chain config, contract addresses, ABI, calldata layout, decoded sample, custom errors, smart-wallet caveat) live in `references/cross-rewards.md`. Lazy-load it only when a script throws an unfamiliar revert or someone is forking the skill.
